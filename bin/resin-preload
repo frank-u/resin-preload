@@ -20,7 +20,7 @@ const USAGE = `
     --registry       Image registry host (default: "registry2.resin.io")
     --splash-image   PNG Image for custom splash screen
 
-    --dont-detect-flasher-type-images Disables the flasher type images detection: treats all images as non flsher types
+    --dont-detect-flasher-type-images Disables the flasher type images detection: treats all images as non flasher types
 
     --help, -h       Display ${info.name} usage
     --version, -v    Display ${info.name} version
@@ -61,18 +61,6 @@ function showError (error, details, report) {
   }
 
   console.error(message)
-}
-
-function exitIfError (code, signal) {
-  if (code !== 0 || signal != null) {
-    const error = new Error(
-      `Preloader exited with ${code == null ? 'signal' : 'code'} ${code == null ? signal : code}`
-    )
-    error.code = code
-    error.signal = signal
-    showError(error)
-    process.exit(code || 1)
-  }
 }
 
 process.on('uncaughtException', (error) => {
@@ -143,12 +131,11 @@ if (!(rwAccess && fs.statSync(options.image).isFile())) {
 
 console.log('\nBuilding preloader image...\n')
 
-preload.build({ stdio: 'inherit' }).once('exit', (code, signal) => {
-  exitIfError(code, signal)
-  console.log('\nPreloading...\n')
-
-  preload.run(options, { stdio: 'inherit' }).once('exit', (code, signal) => {
-    exitIfError(code, signal)
-    console.log('\n[OK] Done.')
-  })
+preload.build()
+.then(() => {
+  console.error('\nPreloading...\n')
+  return preload.run(options)
+})
+.then(() => {
+  console.log('\n[OK] Done.')
 })

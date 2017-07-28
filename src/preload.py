@@ -34,10 +34,13 @@ os.environ["LANG"] = "C"
 
 SECTOR_SIZE = 512
 
+IMAGE = "/img/resin.img"
+
 API_TOKEN = os.environ["API_TOKEN"]
 API_KEY = os.environ["API_KEY"]
 APP_ID = os.environ["APP_ID"]
 COMMIT = os.environ["COMMIT"]
+COMMAND = os.environ["COMMAND"]
 DETECT_FLASHER_TYPE_IMAGES = (
     os.environ["DONT_DETECT_FLASHER_TYPE_IMAGES"] == "FALSE"
 )
@@ -209,6 +212,7 @@ def expand_partitions(image):
 
 def expand_ext4(image, partition):
     # Resize ext4 filesystem
+    error = False
     with losetup_context_manager(image, partition) as loop_device:
         log.info("Using {}".format(loop_device))
         log.info("Resizing filesystem")
@@ -221,8 +225,10 @@ def expand_ext4(image, partition):
                 log.warning("e2fsck: File system errors corrected")
         except ErrorReturnCode:
             log.error("e2fsck: File system errors could not be corrected")
-            exit(1)
+            error = True
         resize2fs("-f", loop_device)
+    if error:
+        exit(1)
 
 
 def expand_btrfs(mountpoint):
@@ -248,7 +254,12 @@ def fix_rce_docker(mountpoint):
 def start_docker_daemon(filesystem_type, mountpoint, socket):
     """Starts the docker daemon and waits for it to be ready."""
     docker_dir = fix_rce_docker(mountpoint)
-    dockerd(s=filesystem_type, g=docker_dir, H="unix://" + socket, _bg=True)
+    dockerd(
+        s=filesystem_type,
+        data_root=docker_dir,
+        H="unix://" + socket,
+        _bg=True,
+	)
     log.info("Waiting for Docker to start...")
     while os.path.isfile(socket):
         inotifywait("-t", 1, "-e", "create", os.path.dirname(socket))
@@ -409,17 +420,18 @@ def check():
     assert APP_ID, "APP_ID must be set"
 
 
-def main():
+def main_preload():
     check()
-    IMAGE = "/img/resin.img"
     log.info("Fetching application data")
     log.info("Using API host {}".format(API_HOST))
     log.info("Using Registry host {}".format(REGISTRY_HOST))
     app_data = get_app_data(APP_ID, COMMIT)
     replace_splash_image(IMAGE)
     repo = app_data["imageRepo"]
-    container_size = get_container_size(repo)
+#    container_size = get_container_size(repo)
+    container_size = 512 * 1024 * 1024
     # Size will be increased by 110% of the container size
+    additional_space = round_to_sector_size(ceil(container_size * 1.1))
     additional_space = round_to_sector_size(ceil(container_size * 1.1))
     device_type = get_device_type(IMAGE)
     deployArtifact = device_type["yocto"]["deployArtifact"]
@@ -443,5 +455,13 @@ def main():
     log.info("Done.")
 
 
+def main_get_device_type_slug():
+    device_type = get_device_type(IMAGE)
+    print(device_type["slug"])
+
+
 if __name__ == "__main__":
-    main()
+    if COMMAND == "preload":
+        main_preload()
+    elif COMMAND == "get_device_type_slug":
+        main_get_device_type_slug()

@@ -51,7 +51,7 @@ Options:
   --registry       Image registry host (default: "registry2.resin.io")
   --splash-image   PNG Image for custom splash screen
 
-  --dont-detect-flasher-type-images Disables the flasher type images detection: treats all images as non flsher types
+  --dont-detect-flasher-type-images Disables the flasher type images detection: treats all images as non flasher types
 
   --help, -h       Display resin-preload usage
   --version, -v    Display resin-preload version
